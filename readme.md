@@ -1,9 +1,44 @@
 # Her Story Transcript Analyzer
 
-This is a script written in ruby that analyzes the Her Story lines and finds a list of optimal search terms for running the game.
+This is a collection of scripts written in ruby to analyze the Her Story clip transcripts and find a list of optimal search terms for running the game in various categories.
 
-## The Algorithm
+# Running Ruby Scripts
 
+### Step 1: Install Ruby
+If you're on mac you probably already have ruby.
+
+You can download ruby here: https://www.ruby-lang.org/en/
+
+### Step 2: Open the folder in a terminal
+Open command prompt on Windows, or Terminal on Mac, and `cd` to the directory where you downloaded and unzipped the code.
+
+Say you extracted the code to `~/Downloads/HerStory/` on Mac. You'd use this command:
+
+```
+cd "~/Downloads/HerStory/"
+```
+
+Or on Windows it might look like this:
+
+```
+cd "C:\Users\John Smith\Downloads\HerStory\"
+```
+
+### Step 3: Run the script
+
+Type `ruby` followed by a space, and the name of the script to run it.
+
+```
+ruby herstory_anyp.rb
+```
+
+or
+
+```
+ruby herstory_100p.rb
+```
+
+# Any% Algorithm - `herstory_anyp.rb`
 I feel silly even calling it an algorithm because it's pretty crude, but hey, it works. Basically it loops through the list of search terms (which are filtered, see below), trying to create the longest list of search terms it can that don't have collisions.
 
 You can go in the script and easily configure the values at the top. If you want to mess around with it, you don't have to know how to program, just download ruby and change the numbers at the top.
