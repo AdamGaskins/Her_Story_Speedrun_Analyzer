@@ -15,7 +15,7 @@ require "./include/process_data.rb"
 ########## LOAD ##########
 ##########################
 
-words, clips = process("HerStory_CSV.csv", false)
+words, clips = process("HerStory_CSV.csv", true)
 
 
 #############################

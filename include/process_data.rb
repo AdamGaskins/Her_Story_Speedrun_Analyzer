@@ -87,11 +87,13 @@ def process(path, calc_variations=true)
 
                     at_least_one_variant_accounted_for = true
                 else # if the word doesn't exist
-                    # add the word to the list
-                    words[word] = {
-                        count: 1,
-                        clips: [ index ]
-                    }
+                    if calc_variations || _word == word
+                        # add the word to the list
+                        words[word] = {
+                            count: 1,
+                            clips: [ index ]
+                        }
+                    end
 
                     # mark that this clip will show for this word (since it's never appeared before)
                     clip[:search_terms] << word
@@ -120,6 +122,8 @@ def process(path, calc_variations=true)
     #     end
     # end
 
+    # puts words
+
     return words, clips
 end
 
@@ -139,7 +143,7 @@ def load_collisions(path)
         row.each_with_index do |cell, j|
             next if j == 0
 
-            collisions[words[j]][row[0]] = cell
+            collisions[words[j]][row[0]] = cell.to_i
         end
     end
 
@@ -153,7 +157,9 @@ def find_word_list( words,
                     chance_to_discard,
                     number_of_times_to_loop,
                     never_include,
-                    start_with)
+                    start_with,
+                    allowed_word_collisions = 0,
+                    allowed_total_collisions = 0)
     # Okay, so the goal is to find the biggest list of search terms we can that
     # don't collide, or with the least number of collisions possible. A collision
     # means two search terms pull up the same video.
@@ -164,6 +170,8 @@ def find_word_list( words,
     # We'll do this a bunch of times, and spit out the list with the most search terms
 
     biggest_list_of_search_terms = []
+    biggest_list_collisions = 0
+    biggest_list_clips_found = 0
 
     (1..number_of_times_to_loop).each do |i|
         # search terms selected
@@ -171,6 +179,8 @@ def find_word_list( words,
 
         # clips that have already come up, and shouldn't come up again
         blacklisted_clips = []
+
+        total_collisions = 0
 
         # preload the start_with words
         start_with.each do |start_with_word|
@@ -191,8 +201,8 @@ def find_word_list( words,
         # loop through each word
         words.each do |word, props|
             # ignore plural words
-            next if word.end_with? "es"
-            next if word.end_with? "s"
+            # next if word.end_with? "es"
+            # next if word.end_with? "s"
 
             # ignore permanently blacklisted words
             next if never_include.include? word
@@ -207,16 +217,20 @@ def find_word_list( words,
             next if word.length > max_word_length
 
             # check to see if the search term pulls up clips we've already seen
-            pulls_up_blacklisted_clips = false
+            word_collisions = 0
+            causes_too_much_collision = false
             props[:clips].each do |clip|
                 if blacklisted_clips.include? clip
-                    pulls_up_blacklisted_clips = true
-                    break
+                    word_collisions += 1
+                    if word_collisions > allowed_word_collisions || (total_collisions + word_collisions) > allowed_total_collisions
+                        causes_too_much_collision = true
+                        break
+                    end
                 end
             end
 
             # ignore words that pull up clips we've already seen
-            next if pulls_up_blacklisted_clips
+            next if causes_too_much_collision
 
             # ignore if random chance
             next if rand < chance_to_discard
@@ -225,19 +239,34 @@ def find_word_list( words,
             # add it to the list
             search_terms << [word, props]
 
+            # count the collisions
+            total_collisions += word_collisions
+
             # blacklist all the clips it pulls up
             props[:clips].each do |clip|
                 blacklisted_clips << clip
             end
         end
 
-        if search_terms.length > biggest_list_of_search_terms.length
+        clips_found = (search_terms.map { |e| e[1][:clips].length }.inject(0, :+) - total_collisions)
+        if clips_found > biggest_list_clips_found
             biggest_list_of_search_terms = search_terms
-            # puts search_terms.length.to_s + ": "
-            # puts search_terms
-            # puts ""
+            biggest_list_clips_found = clips_found
+            biggest_list_collisions = total_collisions
+            output_list(search_terms, total_collisions)
         end
     end
 
-    return biggest_list_of_search_terms
+    return biggest_list_of_search_terms, biggest_list_collisions
+end
+
+def output_list(list, collisions)
+    clips = (list.map { |e| e[1][:clips].length }.inject(0, :+) - collisions)
+    percent = '%.2f' % ((clips / 272.0) * 100)
+    puts list.map { |e| e[0] }.join(", ")
+    puts " - Words: " + list.length.to_s
+    puts " - Collisions: " + collisions.to_s
+    puts " - Clips: " + clips.to_s + " / 272 ("+percent+"%)"
+    puts ""
+    puts ""
 end
