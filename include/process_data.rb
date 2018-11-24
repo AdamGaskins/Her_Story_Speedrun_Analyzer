@@ -23,9 +23,24 @@ def process(path, calc_variations=true)
     # "cat" > "cat" and "cats" and "cates"
     def transform_term(term)
         if term.end_with?("es")
-            return [ term, term[0...-1], term[0...-2] ]
+            if term.end_with?("ses")
+                # I had to add this case in because of words like "senses"
+                # "sens" does NOT pull up results for "senses", because the s ending
+                # it is instead turned into > sen and sens
+                return [ term, term[0...-1] ]
+            else
+                # THIS IS THE NORMAL CASE
+                return [ term, term[0...-1], term[0...-2] ]
+            end
         elsif term.end_with?("s")
-            return [ term, term[0...-1] ]
+            if term.end_with?("ss")
+                # Again, I had to add this case in because of words like "glass"
+                # Glass becomes glas which still looks plural to Her Story.
+                return [ term ]
+            else
+                # THIS IS THE NORMAL CASE
+                return [ term, term[0...-1] ]
+            end
         else
             return [ term, term + "s", term + "es" ]
         end
@@ -52,23 +67,22 @@ def process(path, calc_variations=true)
 
         # loop through each word in the clip
         text.split(' ').each do |_word|
-            variations = [_word]
             # get variations for the word
-            variations = transform_term(_word) if calc_variations
+            variations = transform_term(_word)
 
             # make sure we don't count two variants
             at_least_one_variant_accounted_for = false
 
             # just doing the same thing to multiple variations of this word
             variations.each do |word|
-                # skip empty 'words'
-                next if word.length() == 0
-
                 # skip if we've already seen this word on this line
                 next if words_already_in_this_line.include? word
 
                 # mark this word as already seen this line
                 words_already_in_this_line << word
+
+                # skip empty 'words'
+                next if word.length() == 0
 
                 # if the word has been seen in a previous line
                 if words.has_key? word
@@ -82,24 +96,48 @@ def process(path, calc_variations=true)
                     end
 
                     # increase the occurance count
-                    words[word][:count] += 1 if not at_least_one_variant_accounted_for
+                    words[word][:count] += 1# if not at_least_one_variant_accounted_for
 
 
                     at_least_one_variant_accounted_for = true
                 else # if the word doesn't exist
-                    if calc_variations || _word == word
-                        # add the word to the list
-                        words[word] = {
-                            count: 1,
-                            clips: [ index ]
-                        }
-                    end
+                    # add the word to the list
+                    words[word] = {
+                        count: 1,
+                        clips: [ index ]
+                    }
 
                     # mark that this clip will show for this word (since it's never appeared before)
                     clip[:search_terms] << word
 
                     at_least_one_variant_accounted_for = true
                 end
+            end
+
+            # Then finally, the entire line itself can be one search term if quoted
+            # Why is this important?
+            # Well only in the case of "yes" or "no" really.
+            quoted_term = '"' + text.gsub(/[^a-zA-Z0-9]/i, '') + '"'
+
+            # That's why we ignore anything longer than a few characters
+            next if quoted_term.length > 10
+
+            # add search term to clip
+            clip[:search_terms] << quoted_term
+
+            # if the quoted word has been seen in a previous line
+            if words.has_key? quoted_term
+                # add clip to search term
+                words[quoted_term][:clips] << index
+
+                # increase the occurance count
+                words[quoted_term][:count] += 1# if not at_least_one_variant_accounted_for
+            else # if the word doesn't exist
+                # add the word to the list
+                words[quoted_term] = {
+                    count: 1,
+                    clips: [ index ]
+                }
             end
         end
 
@@ -121,8 +159,6 @@ def process(path, calc_variations=true)
     #         csv << line
     #     end
     # end
-
-    # puts words
 
     return words, clips
 end
@@ -200,10 +236,6 @@ def find_word_list( words,
 
         # loop through each word
         words.each do |word, props|
-            # ignore plural words
-            # next if word.end_with? "es"
-            # next if word.end_with? "s"
-
             # ignore permanently blacklisted words
             next if never_include.include? word
 
